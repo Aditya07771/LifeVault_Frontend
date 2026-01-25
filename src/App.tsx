@@ -22,7 +22,7 @@ const queryClient = new QueryClient();
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -30,18 +30,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
-// Public Route (redirect if logged in)
+// Public Route
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -49,30 +49,25 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  
+
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-      
-      {/* Protected Routes */}
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/privacy" element={<ProtectedRoute><Privacy /></ProtectedRoute>} />
       <Route path="/legacy" element={<ProtectedRoute><Legacy /></ProtectedRoute>} />
-      
-      {/* Catch all */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -84,11 +79,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <WalletProvider>
+        <WalletProvider>
+          <AuthProvider>
             <AppRoutes />
-          </WalletProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </WalletProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
