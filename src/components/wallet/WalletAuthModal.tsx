@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  X, 
-  Wallet, 
-  Shield, 
-  Check, 
-  Loader2, 
+import {
+  X,
+  Wallet,
+  Shield,
+  Check,
+  Loader2,
   AlertCircle,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 
 interface WalletAuthModalProps {
@@ -19,37 +19,54 @@ interface WalletAuthModalProps {
   mode: 'login' | 'link';
 }
 
+type Step = 'connect' | 'sign' | 'success' | 'error';
+
 export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
   isOpen,
   onClose,
-  mode
+  mode,
 }) => {
   const navigate = useNavigate();
   const { updateUser } = useAuth();
   const {
-    isConnected,
-    isConnecting,
-    address,
+    connected,
+    connecting,
+    account,
     isPetraInstalled,
     connect,
     authenticateWithWallet,
-    linkWalletToAccount
+    linkWalletToAccount,
   } = useWallet();
 
-  const [step, setStep] = useState<'connect' | 'sign' | 'success' | 'error'>('connect');
+  const [step, setStep] = useState<Step>('connect');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setStep(connected ? 'sign' : 'connect');
+      setError(null);
+      setLoading(false);
+    }
+  }, [isOpen, connected]);
+
+  // Update step when connection status changes
+  useEffect(() => {
+    if (connected && step === 'connect') {
+      setStep('sign');
+    }
+  }, [connected, step]);
 
   if (!isOpen) return null;
 
   const handleConnect = async () => {
     setError(null);
-    const result = await connect();
-    
-    if (result.success) {
+    try {
+      await connect('Petra' as any);
       setStep('sign');
-    } else {
-      setError(result.error || 'Failed to connect wallet');
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect wallet');
     }
   };
 
@@ -59,7 +76,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
 
     try {
       let result;
-      
+
       if (mode === 'login') {
         result = await authenticateWithWallet();
       } else {
@@ -68,12 +85,12 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
 
       if (result.success) {
         setStep('success');
-        
-        // If linking, update user context
-        if (mode === 'link' && address) {
-          updateUser({ aptosAddress: address });
+
+        // Update user context if linking
+        if (mode === 'link' && account?.address) {
+          updateUser({ aptosAddress: account.address });
         }
-        
+
         // Redirect after success
         setTimeout(() => {
           onClose();
@@ -95,7 +112,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
 
   const handleRetry = () => {
     setError(null);
-    setStep(isConnected ? 'sign' : 'connect');
+    setStep(connected ? 'sign' : 'connect');
   };
 
   const truncateAddress = (addr: string) => {
@@ -105,7 +122,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      
+
       <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-black/5">
@@ -131,17 +148,27 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
         <div className="p-6">
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-3 mb-8">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              step === 'connect' ? 'bg-black text-white' : 
-              ['sign', 'success'].includes(step) ? 'bg-green-500 text-white' : 'bg-black/10 text-black/50'
-            }`}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                step === 'connect'
+                  ? 'bg-black text-white'
+                  : ['sign', 'success'].includes(step)
+                  ? 'bg-green-500 text-white'
+                  : 'bg-black/10 text-black/50'
+              }`}
+            >
               {['sign', 'success'].includes(step) ? <Check className="w-4 h-4" /> : '1'}
             </div>
             <div className={`w-16 h-0.5 ${['sign', 'success'].includes(step) ? 'bg-green-500' : 'bg-black/10'}`} />
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              step === 'sign' ? 'bg-black text-white' : 
-              step === 'success' ? 'bg-green-500 text-white' : 'bg-black/10 text-black/50'
-            }`}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                step === 'sign'
+                  ? 'bg-black text-white'
+                  : step === 'success'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-black/10 text-black/50'
+              }`}
+            >
               {step === 'success' ? <Check className="w-4 h-4" /> : '2'}
             </div>
           </div>
@@ -153,9 +180,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 <AlertCircle className="w-8 h-8 text-orange-500" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Petra Wallet Required</h3>
-              <p className="text-black/50 mb-6">
-                Please install Petra wallet to continue
-              </p>
+              <p className="text-black/50 mb-6">Please install Petra wallet to continue</p>
               <a
                 href="https://petra.app/"
                 target="_blank"
@@ -175,15 +200,13 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 <Wallet className="w-10 h-10 text-black" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
-              <p className="text-black/50 mb-6">
-                Click below to connect your Petra wallet
-              </p>
+              <p className="text-black/50 mb-6">Click below to connect your Petra wallet</p>
               <button
                 onClick={handleConnect}
-                disabled={isConnecting}
+                disabled={connecting}
                 className="w-full py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isConnecting ? (
+                {connecting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Connecting...
@@ -205,13 +228,13 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 <Shield className="w-10 h-10 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Sign Message</h3>
-              {address && (
+              {account?.address && (
                 <p className="text-sm text-black/50 mb-2">
-                  Connected: <span className="font-mono">{truncateAddress(address)}</span>
+                  Connected: <span className="font-mono">{truncateAddress(account.address)}</span>
                 </p>
               )}
               <p className="text-black/50 mb-6">
-                Sign a message to verify ownership of your wallet. This won't cost any gas.
+                Sign a message to verify ownership. This won't cost any gas.
               </p>
               <button
                 onClick={handleSign}
@@ -243,7 +266,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 {mode === 'login' ? 'Successfully Authenticated!' : 'Wallet Linked Successfully!'}
               </h3>
               <p className="text-black/50">
-                {mode === 'login' ? 'Redirecting to your dashboard...' : 'Your wallet is now connected to your account'}
+                {mode === 'login' ? 'Redirecting to your dashboard...' : 'Your wallet is now connected'}
               </p>
             </div>
           )}
@@ -265,7 +288,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Inline error */}
           {error && step !== 'error' && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -274,15 +297,16 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
           )}
         </div>
 
-        {/* Footer Note */}
+        {/* Footer */}
         <div className="px-6 pb-6">
           <div className="p-4 bg-gray-50 rounded-xl">
             <div className="flex items-start gap-3">
               <Shield className="w-5 h-5 text-black/30 mt-0.5" />
               <div>
                 <p className="text-xs text-black/50">
-                  <strong className="text-black/70">Secure & Gas-Free</strong><br />
-                  Signing a message only proves you own this wallet. It doesn't trigger any blockchain transaction or cost gas fees.
+                  <strong className="text-black/70">Secure & Gas-Free</strong>
+                  <br />
+                  Signing only proves wallet ownership. No blockchain transaction or gas fees.
                 </p>
               </div>
             </div>

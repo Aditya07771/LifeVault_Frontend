@@ -1,214 +1,265 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import walletService from '@/services/walletService';
+import React, { createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
+import {
+  AptosWalletAdapterProvider,
+  useWallet as useAptosWallet,
+  Wallet,
+  WalletName,
+  InputTransactionData
+} from '@aptos-labs/wallet-adapter-react';
+import { PetraWallet } from 'petra-plugin-wallet-adapter';
+import { Network } from '@aptos-labs/ts-sdk';
 import api from '@/services/api';
 
+// Define the wallet context type
 interface WalletContextType {
-  // State
-  isConnected: boolean;
-  isConnecting: boolean;
-  address: string | null;
-  publicKey: string | null;
-  network: string | null;
-  isPetraInstalled: boolean;
+  // Connection state
+  connected: boolean;
+  connecting: boolean;
+  disconnecting: boolean;
+  wallet: Wallet | null;
+  wallets: readonly Wallet[];
+  
+  // Account info
+  account: {
+    address: string;
+    publicKey: string;
+  } | null;
+  network: {
+    name: string;
+    chainId?: string;
+    url?: string;
+  } | null;
   
   // Actions
-  connect: () => Promise<{ success: boolean; address?: string; error?: string }>;
+  connect: (walletName?: WalletName) => Promise<void>;
   disconnect: () => Promise<void>;
-  signMessage: (message: string) => Promise<{ signature: string; fullMessage: string; nonce: string }>;
+  signMessage: (message: string) => Promise<{
+    signature: string;
+    fullMessage: string;
+    nonce: string;
+  }>;
+  signAndSubmitTransaction: (transaction: InputTransactionData) => Promise<{ hash: string }>;
+  
+  // Auth actions
   authenticateWithWallet: () => Promise<{ success: boolean; token?: string; error?: string }>;
   linkWalletToAccount: () => Promise<{ success: boolean; error?: string }>;
+  
+  // Helpers
+  isPetraInstalled: boolean;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
-export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [address, setAddress] = useState<string | null>(null);
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [network, setNetwork] = useState<string | null>(null);
-  const [isPetraInstalled, setIsPetraInstalled] = useState(false);
+// Inner component that uses the Aptos wallet hook
+const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const {
+    connect: aptosConnect,
+    disconnect: aptosDisconnect,
+    account,
+    connected,
+    connecting,
+    disconnecting,
+    wallet,
+    wallets,
+    network,
+    signMessage: aptosSignMessage,
+    signAndSubmitTransaction: aptosSignAndSubmitTransaction,
+  } = useAptosWallet();
 
-  // Check wallet status on mount
-  useEffect(() => {
-    const checkWallet = async () => {
-      const installed = walletService.isPetraInstalled();
-      setIsPetraInstalled(installed);
+  // Check if Petra is installed
+  const isPetraInstalled = useMemo(() => {
+    return wallets.some(w => w.name === 'Petra');
+  }, [wallets]);
 
-      if (installed) {
-        const account = await walletService.getAccount();
-        if (account) {
-          setIsConnected(true);
-          setAddress(account.address);
-          setPublicKey(account.publicKey);
-          const net = await walletService.getNetwork();
-          setNetwork(net);
-        }
-      }
-    };
-
-    // Small delay to ensure window.aptos is available
-    const timer = setTimeout(checkWallet, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Listen for account changes
-  useEffect(() => {
-    if (isPetraInstalled) {
-      walletService.onAccountChange((account) => {
-        if (account) {
-          setAddress(account.address);
-          setPublicKey(account.publicKey);
-          setIsConnected(true);
-        } else {
-          setAddress(null);
-          setPublicKey(null);
-          setIsConnected(false);
-        }
-      });
-
-      walletService.onNetworkChange((net) => {
-        setNetwork(net.name);
-      });
-    }
-  }, [isPetraInstalled]);
-
-  const connect = useCallback(async () => {
+  // Connect to wallet
+  const connect = useCallback(async (walletName?: WalletName) => {
     try {
-      setIsConnecting(true);
-      const result = await walletService.connect();
-      setIsConnected(true);
-      setAddress(result.address);
-      setPublicKey(result.publicKey);
-      const net = await walletService.getNetwork();
-      setNetwork(net);
-      return { success: true, address: result.address };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    } finally {
-      setIsConnecting(false);
+      await aptosConnect(walletName || 'Petra' as WalletName);
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+      throw error;
     }
-  }, []);
+  }, [aptosConnect]);
 
+  // Disconnect wallet
   const disconnect = useCallback(async () => {
-    await walletService.disconnect();
-    setIsConnected(false);
-    setAddress(null);
-    setPublicKey(null);
-  }, []);
+    try {
+      await aptosDisconnect();
+    } catch (error) {
+      console.error('Failed to disconnect wallet:', error);
+      throw error;
+    }
+  }, [aptosDisconnect]);
 
+  // Sign a message
   const signMessage = useCallback(async (message: string) => {
-    return await walletService.signMessage(message);
+    if (!connected || !account) {
+      throw new Error('Wallet not connected');
+    }
+
+    const nonce = Date.now().toString() + Math.random().toString(36).substring(2);
+    
+    const response = await aptosSignMessage({
+      message,
+      nonce,
+    });
+
+    return {
+      signature: response.signature as string,
+      fullMessage: response.fullMessage,
+      nonce: response.nonce,
+    };
+  }, [connected, account, aptosSignMessage]);
+
+  // Sign and submit transaction
+  const signAndSubmitTransaction = useCallback(async (transaction: InputTransactionData) => {
+    if (!connected) {
+      throw new Error('Wallet not connected');
+    }
+
+    const response = await aptosSignAndSubmitTransaction(transaction);
+    return { hash: response.hash };
+  }, [connected, aptosSignAndSubmitTransaction]);
+
+  // Generate auth message
+  const generateAuthMessage = useCallback((address: string) => {
+    const timestamp = Date.now();
+    return `Sign this message to authenticate with LifeVault.\n\nWallet: ${address}\nTimestamp: ${timestamp}\n\nThis signature will not trigger any blockchain transaction or cost any gas fees.`;
   }, []);
 
-  /**
-   * Authenticate with wallet (login/register via wallet)
-   */
+  // Authenticate with wallet
   const authenticateWithWallet = useCallback(async () => {
     try {
-      if (!address) {
-        const connectResult = await connect();
-        if (!connectResult.success) {
-          return { success: false, error: connectResult.error };
-        }
+      if (!connected || !account) {
+        // Try to connect first
+        await connect();
+        // Wait a bit for connection to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const currentAddress = address || walletService.getAddress();
-      if (!currentAddress) {
-        return { success: false, error: 'No wallet address' };
+      const currentAccount = account;
+      if (!currentAccount?.address) {
+        return { success: false, error: 'No wallet connected' };
       }
 
-      // Generate auth message
-      const message = walletService.generateAuthMessage(currentAddress);
-      
-      // Sign the message
-      const signResult = await walletService.signMessage(message);
-      
-      // Send to backend for verification
+      const message = generateAuthMessage(currentAccount.address);
+      const signResult = await signMessage(message);
+
+      // Send to backend
       const response = await api.post('/auth/wallet', {
-        address: currentAddress,
-        publicKey: publicKey || walletService.getPublicKey(),
+        address: currentAccount.address,
+        publicKey: currentAccount.publicKey,
         signature: signResult.signature,
         message: signResult.fullMessage,
-        nonce: signResult.nonce
+        nonce: signResult.nonce,
       });
 
       const { token } = response.data.data;
       localStorage.setItem('token', token);
-      
+
       return { success: true, token };
     } catch (error: any) {
       console.error('Wallet authentication failed:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message 
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Authentication failed',
       };
     }
-  }, [address, publicKey, connect]);
+  }, [connected, account, connect, signMessage, generateAuthMessage]);
 
-  /**
-   * Link wallet to existing account
-   */
+  // Link wallet to existing account
   const linkWalletToAccount = useCallback(async () => {
     try {
-      if (!address) {
-        const connectResult = await connect();
-        if (!connectResult.success) {
-          return { success: false, error: connectResult.error };
-        }
+      if (!connected || !account) {
+        await connect();
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const currentAddress = address || walletService.getAddress();
-      if (!currentAddress) {
-        return { success: false, error: 'No wallet address' };
+      const currentAccount = account;
+      if (!currentAccount?.address) {
+        return { success: false, error: 'No wallet connected' };
       }
 
-      // Generate link message
-      const message = `Link this wallet to your LifeVault account.\n\nWallet: ${currentAddress}\nTimestamp: ${Date.now()}`;
-      
-      // Sign the message
-      const signResult = await walletService.signMessage(message);
-      
-      // Send to backend
+      const message = `Link this wallet to your LifeVault account.\n\nWallet: ${currentAccount.address}\nTimestamp: ${Date.now()}`;
+      const signResult = await signMessage(message);
+
       const response = await api.post('/auth/link-wallet', {
-        address: currentAddress,
-        publicKey: publicKey || walletService.getPublicKey(),
+        address: currentAccount.address,
+        publicKey: currentAccount.publicKey,
         signature: signResult.signature,
         message: signResult.fullMessage,
-        nonce: signResult.nonce
+        nonce: signResult.nonce,
       });
 
       return { success: true };
     } catch (error: any) {
       console.error('Wallet linking failed:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message 
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to link wallet',
       };
     }
-  }, [address, publicKey, connect]);
+  }, [connected, account, connect, signMessage]);
+
+  const value: WalletContextType = {
+    connected,
+    connecting,
+    disconnecting,
+    wallet,
+    wallets,
+    account: account ? {
+      address: account.address,
+      publicKey: account.publicKey as string,
+    } : null,
+    network: network ? {
+      name: network.name,
+      chainId: network.chainId,
+      url: network.url,
+    } : null,
+    connect,
+    disconnect,
+    signMessage,
+    signAndSubmitTransaction,
+    authenticateWithWallet,
+    linkWalletToAccount,
+    isPetraInstalled,
+  };
 
   return (
-    <WalletContext.Provider
-      value={{
-        isConnected,
-        isConnecting,
-        address,
-        publicKey,
-        network,
-        isPetraInstalled,
-        connect,
-        disconnect,
-        signMessage,
-        authenticateWithWallet,
-        linkWalletToAccount
-      }}
-    >
+    <WalletContext.Provider value={value}>
       {children}
     </WalletContext.Provider>
   );
 };
 
+// Outer provider that wraps with AptosWalletAdapterProvider
+export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Configure wallets - add Petra
+  const wallets = [new PetraWallet()];
+
+  return (
+    <AptosWalletAdapterProvider
+      plugins={wallets}
+      autoConnect={true}
+      dappConfig={{
+        network: Network.TESTNET,
+        aptosApiKey: import.meta.env.VITE_APTOS_API_KEY,
+        aptosConnect: {
+          dappId: 'lifevault',
+        },
+      }}
+      onError={(error) => {
+        console.error('Wallet adapter error:', error);
+      }}
+    >
+      <WalletContextProvider>
+        {children}
+      </WalletContextProvider>
+    </AptosWalletAdapterProvider>
+  );
+};
+
+// Hook to use wallet context
 export const useWallet = () => {
   const context = useContext(WalletContext);
   if (!context) {
