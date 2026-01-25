@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Vault } from "lucide-react";
+import { Menu, X, Vault, Link } from "lucide-react";
 
 const navLinks = [
   { href: "#about", label: "About" },
@@ -33,13 +33,17 @@ export function Navbar() {
           }`}
       >
         <div className="h-full max-w-7xl mx-auto px-5 lg:px-20 flex items-center justify-between">
+          
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2 group">
+          <a href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center">
               <Vault className="w-5 h-5 text-white" />
             </div>
+            
             <span className="text-2xl font-bold text-black tracking-tight">LifeVault</span>
+           
           </a>
+        
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
@@ -58,9 +62,12 @@ export function Navbar() {
             <a href="/login" className="nav-link">
               Login
             </a>
-            <button className="btn-gradient text-sm !px-6 !py-3">
+            <a href="/register" className="btn-gradient w-[50%] text-center !py-3">
+              Get Started
+            </a>
+            {/* <button className="btn-gradient text-sm !px-6 !py-3">
               Sign Up
-            </button>
+            </button> */}
           </div>
 
           {/* Mobile Menu Button */}

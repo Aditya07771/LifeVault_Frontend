@@ -1,20 +1,31 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI } from '@/services/api';
+import type { User } from '@/types';
 
-const AuthContext = createContext(null);
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (email: string, password: string, name?: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
+  updateUser: (data: Partial<User>) => void;
+  isAuthenticated: boolean;
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if user is logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          const response = await api.get('/auth/me');
+          const response = await authAPI.getMe();
           setUser(response.data.data);
         } catch (err) {
           localStorage.removeItem('token');
@@ -26,30 +37,30 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email: string, password: string) => {
     try {
       setError(null);
-      const response = await api.post('/auth/login', { email, password });
+      const response = await authAPI.login(email, password);
       const { token, user: userData } = response.data.data;
       localStorage.setItem('token', token);
       setUser(userData);
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       const message = err.response?.data?.message || 'Login failed';
       setError(message);
       return { success: false, message };
     }
   };
 
-  const register = async (email, password, name) => {
+  const register = async (email: string, password: string, name?: string) => {
     try {
       setError(null);
-      const response = await api.post('/auth/register', { email, password, name });
+      const response = await authAPI.register(email, password, name);
       const { token, user: userData } = response.data.data;
       localStorage.setItem('token', token);
       setUser(userData);
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       const message = err.response?.data?.message || 'Registration failed';
       setError(message);
       return { success: false, message };
@@ -61,8 +72,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateUser = (data) => {
-    setUser(prev => ({ ...prev, ...data }));
+  const updateUser = (data: Partial<User>) => {
+    setUser(prev => prev ? { ...prev, ...data } : null);
   };
 
   return (
