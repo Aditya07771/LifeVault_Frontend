@@ -4,9 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { WalletProvider } from "@/context/WalletContext";
 
 // Pages
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
@@ -14,7 +16,6 @@ import Settings from "./pages/Settings";
 import Privacy from "./pages/Privacy";
 import Legacy from "./pages/Legacy";
 import NotFound from "./pages/NotFound";
-import Login from "./pages/login";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +62,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Index />} />
-      <Route path="/login" element={<PublicRoute><Login/></PublicRoute>} />
+      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       
       {/* Protected Routes */}
@@ -84,7 +85,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <WalletProvider>
+            <AppRoutes />
+          </WalletProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
