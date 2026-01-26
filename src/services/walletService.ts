@@ -2,23 +2,23 @@
 import { toast } from '@/hooks/use-toast';
 
 // Petra wallet interface
-interface PetraWallet {
-  connect: () => Promise<{ address: string; publicKey: string }>;
-  disconnect: () => Promise<void>;
-  isConnected: () => Promise<boolean>;
-  account: () => Promise<{ address: string; publicKey: string }>;
-  signMessage: (payload: { message: string; nonce: string }) => Promise<{
-    fullMessage: string;
-    message: string;
-    nonce: string;
-    prefix: string;
-    signature: string;
-  }>;
-  signAndSubmitTransaction: (transaction: any) => Promise<{ hash: string }>;
-  network: () => Promise<string>;
-  onAccountChange: (callback: (account: { address: string; publicKey: string } | null) => void) => void;
-  onNetworkChange: (callback: (network: { name: string; chainId: string }) => void) => void;
-}
+// interface PetraWallet {
+//   connect: () => Promise<{ address: string; publicKey: string }>;
+//   disconnect: () => Promise<void>;
+//   isConnected: () => Promise<boolean>;
+//   account: () => Promise<{ address: string; publicKey: string }>;
+//   signMessage: (payload: { message: string; nonce: string }) => Promise<{
+//     fullMessage: string;
+//     message: string;
+//     nonce: string;
+//     prefix: string;
+//     signature: string;
+//   }>;
+//   signAndSubmitTransaction: (transaction: any) => Promise<{ hash: string }>;
+//   network: () => Promise<string>;
+//   onAccountChange: (callback: (account: { address: string; publicKey: string } | null) => void) => void;
+//   onNetworkChange: (callback: (network: { name: string; chainId: string }) => void) => void;
+// }
 
 declare global {
   interface Window {

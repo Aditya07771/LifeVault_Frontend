@@ -10,7 +10,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWalletModal, setShowWalletModal] = useState(false);
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -20,18 +20,14 @@ const Login: React.FC = () => {
     setLoading(true);
 
     const result = await login(email, password);
-    
+
     if (result.success) {
       navigate('/dashboard');
     } else {
       setError(result.message || 'Login failed');
     }
-    
-    setLoading(false);
-  };
 
-  const handleWalletSuccess = () => {
-    navigate('/dashboard');
+    setLoading(false);
   };
 
   return (
@@ -51,7 +47,7 @@ const Login: React.FC = () => {
 
           {/* Form Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-black/5 p-8">
-            {/* Wallet Login Button */}
+            {/* Wallet Login */}
             <button
               onClick={() => setShowWalletModal(true)}
               className="w-full py-3 mb-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all flex items-center justify-center gap-2"
@@ -125,7 +121,6 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* Back to home */}
           <div className="text-center mt-6">
             <Link to="/" className="text-sm text-black/50 hover:text-black transition-colors">
               ← Back to home
@@ -134,7 +129,6 @@ const Login: React.FC = () => {
         </div>
       </div>
 
-      {/* Wallet Auth Modal */}
       <WalletAuthModal
         isOpen={showWalletModal}
         onClose={() => setShowWalletModal(false)}

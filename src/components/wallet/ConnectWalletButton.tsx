@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { 
   Wallet, 
@@ -8,7 +8,8 @@ import {
   Check, 
   Loader2, 
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 
 interface ConnectWalletButtonProps {
@@ -33,6 +34,7 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
     network,
     wallets,
     isPetraInstalled,
+    isWalletReady,
     connect,
     disconnect,
   } = useWallet();
@@ -40,6 +42,23 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingWallet, setCheckingWallet] = useState(true);
+
+  // Wait for wallet detection
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCheckingWallet(false);
+    }, 1500); // Give enough time for wallet detection
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Update checking state when wallet is ready
+  useEffect(() => {
+    if (isWalletReady) {
+      setCheckingWallet(false);
+    }
+  }, [isWalletReady]);
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -48,8 +67,9 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
   const handleConnect = async () => {
     try {
       setError(null);
-      await connect('Petra' as any);
+      await connect();
     } catch (err: any) {
+      console.error('Connection error:', err);
       setError(err.message || 'Connection failed');
     }
   };
@@ -67,6 +87,10 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
     setShowDropdown(false);
   };
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
   const sizeClasses = {
     sm: 'px-3 py-1.5 text-sm',
     md: 'px-4 py-2.5 text-sm',
@@ -79,19 +103,41 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
     ghost: 'text-black hover:bg-black/5',
   };
 
-  // Wallet not installed
-  if (!isPetraInstalled) {
+  // Still checking for wallet
+  if (checkingWallet && !isPetraInstalled && !connected) {
     return (
-      <a
-        href="https://petra.app/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
+      <button
+        disabled
+        className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors ${sizeClasses[size]} bg-gray-100 text-gray-400 ${className}`}
       >
-        <Wallet className="w-4 h-4" />
-        Install Petra
-        <ExternalLink className="w-3 h-3" />
-      </a>
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Detecting wallet...
+      </button>
+    );
+  }
+
+  // Wallet not installed - show install link
+  if (!isPetraInstalled && !checkingWallet) {
+    return (
+      <div className="flex flex-col items-end gap-2">
+        <a
+          href="https://petra.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
+        >
+          <Wallet className="w-4 h-4" />
+          Install Petra
+          <ExternalLink className="w-3 h-3" />
+        </a>
+        <button
+          onClick={handleRefresh}
+          className="flex items-center gap-1 text-xs text-black/50 hover:text-black"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Already installed? Refresh
+        </button>
+      </div>
     );
   }
 
@@ -120,7 +166,7 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-black/50 uppercase tracking-wider">Network</span>
                   <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                    {network?.name || 'Unknown'}
+                    {network?.name || 'Testnet'}
                   </span>
                 </div>
               </div>
@@ -170,7 +216,7 @@ export const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({
     );
   }
 
-  // Not connected
+  // Not connected - show connect button
   return (
     <div className="flex flex-col items-end gap-2">
       <button

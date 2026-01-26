@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ArrowRight,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 
 interface WalletAuthModalProps {
@@ -19,7 +20,7 @@ interface WalletAuthModalProps {
   mode: 'login' | 'link';
 }
 
-type Step = 'connect' | 'sign' | 'success' | 'error';
+type Step = 'detecting' | 'connect' | 'sign' | 'success' | 'error';
 
 export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
   isOpen,
@@ -33,39 +34,66 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
     connecting,
     account,
     isPetraInstalled,
+    isWalletReady,
     connect,
     authenticateWithWallet,
     linkWalletToAccount,
   } = useWallet();
 
-  const [step, setStep] = useState<Step>('connect');
+  const [step, setStep] = useState<Step>('detecting');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset state when modal opens
+  // Determine initial step
   useEffect(() => {
-    if (isOpen) {
-      setStep(connected ? 'sign' : 'connect');
-      setError(null);
-      setLoading(false);
-    }
-  }, [isOpen, connected]);
+    if (!isOpen) return;
+    
+    setError(null);
+    setLoading(false);
 
-  // Update step when connection status changes
+    const determineStep = () => {
+      if (connected && account) {
+        setStep('sign');
+      } else if (isPetraInstalled || isWalletReady) {
+        setStep('connect');
+      } else {
+        setStep('detecting');
+      }
+    };
+
+    // Immediate check
+    determineStep();
+
+    // Delayed check for wallet detection
+    const timer = setTimeout(() => {
+      if (step === 'detecting') {
+        setStep('connect');
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Update step when connection changes
   useEffect(() => {
-    if (connected && step === 'connect') {
+    if (!isOpen) return;
+    
+    if (connected && account && step === 'connect') {
+      console.log('Connected with account, moving to sign step');
       setStep('sign');
     }
-  }, [connected, step]);
+  }, [connected, account, step, isOpen]);
 
   if (!isOpen) return null;
 
   const handleConnect = async () => {
     setError(null);
     try {
-      await connect('Petra' as any);
-      setStep('sign');
+      console.log('Connecting wallet...');
+      await connect();
+      // Don't set step here - the useEffect will handle it when account is available
     } catch (err: any) {
+      console.error('Connection error:', err);
       setError(err.message || 'Failed to connect wallet');
     }
   };
@@ -75,6 +103,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
     setError(null);
 
     try {
+      console.log('Starting sign process...');
       let result;
 
       if (mode === 'login') {
@@ -83,19 +112,21 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
         result = await linkWalletToAccount();
       }
 
+      console.log('Auth result:', result);
+
       if (result.success) {
         setStep('success');
 
-        // Update user context if linking
         if (mode === 'link' && account?.address) {
           updateUser({ aptosAddress: account.address });
         }
 
-        // Redirect after success
         setTimeout(() => {
           onClose();
           if (mode === 'login') {
             navigate('/dashboard');
+            // Force refresh to update auth state
+            window.location.reload();
           }
         }, 1500);
       } else {
@@ -103,6 +134,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
         setStep('error');
       }
     } catch (err: any) {
+      console.error('Sign error:', err);
       setError(err.message || 'Something went wrong');
       setStep('error');
     } finally {
@@ -112,10 +144,21 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
 
   const handleRetry = () => {
     setError(null);
-    setStep(connected ? 'sign' : 'connect');
+    if (connected && account) {
+      setStep('sign');
+    } else if (isPetraInstalled) {
+      setStep('connect');
+    } else {
+      setStep('detecting');
+    }
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
   };
 
   const truncateAddress = (addr: string) => {
+    if (!addr) return '';
     return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
   };
 
@@ -147,34 +190,47 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
         {/* Body */}
         <div className="p-6">
           {/* Step Indicator */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                step === 'connect'
-                  ? 'bg-black text-white'
-                  : ['sign', 'success'].includes(step)
-                  ? 'bg-green-500 text-white'
-                  : 'bg-black/10 text-black/50'
-              }`}
-            >
-              {['sign', 'success'].includes(step) ? <Check className="w-4 h-4" /> : '1'}
+          {!['detecting', 'error'].includes(step) && (
+            <div className="flex items-center justify-center gap-3 mb-8">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  step === 'connect'
+                    ? 'bg-black text-white'
+                    : ['sign', 'success'].includes(step)
+                    ? 'bg-green-500 text-white'
+                    : 'bg-black/10 text-black/50'
+                }`}
+              >
+                {['sign', 'success'].includes(step) ? <Check className="w-4 h-4" /> : '1'}
+              </div>
+              <div className={`w-16 h-0.5 transition-colors ${['sign', 'success'].includes(step) ? 'bg-green-500' : 'bg-black/10'}`} />
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  step === 'sign'
+                    ? 'bg-black text-white'
+                    : step === 'success'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-black/10 text-black/50'
+                }`}
+              >
+                {step === 'success' ? <Check className="w-4 h-4" /> : '2'}
+              </div>
             </div>
-            <div className={`w-16 h-0.5 ${['sign', 'success'].includes(step) ? 'bg-green-500' : 'bg-black/10'}`} />
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                step === 'sign'
-                  ? 'bg-black text-white'
-                  : step === 'success'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-black/10 text-black/50'
-              }`}
-            >
-              {step === 'success' ? <Check className="w-4 h-4" /> : '2'}
-            </div>
-          </div>
+          )}
 
-          {/* Not Installed */}
-          {!isPetraInstalled && (
+          {/* Step: Detecting */}
+          {step === 'detecting' && (
+            <div className="text-center py-8">
+              <div className="w-20 h-20 bg-black/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Loader2 className="w-10 h-10 text-black animate-spin" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Detecting Wallet</h3>
+              <p className="text-black/50">Looking for Petra wallet...</p>
+            </div>
+          )}
+
+          {/* Step: Connect (Not Installed) */}
+          {step === 'connect' && !isPetraInstalled && (
             <div className="text-center py-8">
               <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-8 h-8 text-orange-500" />
@@ -185,16 +241,25 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 href="https://petra.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80 mb-4"
               >
                 Install Petra Wallet
                 <ExternalLink className="w-4 h-4" />
               </a>
+              <div>
+                <button
+                  onClick={handleRefresh}
+                  className="inline-flex items-center gap-2 text-sm text-black/50 hover:text-black"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Already installed? Click to refresh
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step: Connect */}
-          {isPetraInstalled && step === 'connect' && (
+          {/* Step: Connect (Installed) */}
+          {step === 'connect' && isPetraInstalled && (
             <div className="text-center py-4">
               <div className="w-20 h-20 bg-black/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <Wallet className="w-10 h-10 text-black" />
@@ -218,27 +283,36 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                   </>
                 )}
               </button>
+              
+              {/* Debug info */}
+              <div className="mt-4 text-xs text-black/30">
+                Connected: {connected ? 'Yes' : 'No'} | 
+                Account: {account?.address ? 'Yes' : 'No'}
+              </div>
             </div>
           )}
 
           {/* Step: Sign */}
-          {isPetraInstalled && step === 'sign' && (
+          {step === 'sign' && (
             <div className="text-center py-4">
               <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <Shield className="w-10 h-10 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Sign Message</h3>
               {account?.address && (
-                <p className="text-sm text-black/50 mb-2">
-                  Connected: <span className="font-mono">{truncateAddress(account.address)}</span>
-                </p>
+                <div className="mb-4">
+                  <p className="text-sm text-black/50">Connected wallet:</p>
+                  <p className="font-mono text-sm bg-black/5 rounded-lg px-3 py-2 mt-1">
+                    {truncateAddress(account.address)}
+                  </p>
+                </div>
               )}
               <p className="text-black/50 mb-6">
                 Sign a message to verify ownership. This won't cost any gas.
               </p>
               <button
                 onClick={handleSign}
-                disabled={loading}
+                disabled={loading || !account}
                 className="w-full py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -259,7 +333,7 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
           {/* Step: Success */}
           {step === 'success' && (
             <div className="text-center py-8">
-              <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-bounce">
                 <Check className="w-10 h-10 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2 text-green-600">
@@ -278,18 +352,20 @@ export const WalletAuthModal: React.FC<WalletAuthModalProps> = ({
                 <AlertCircle className="w-10 h-10 text-red-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2 text-red-600">Authentication Failed</h3>
-              <p className="text-black/50 mb-6">{error || 'Something went wrong. Please try again.'}</p>
+              <p className="text-black/50 mb-2">{error || 'Something went wrong.'}</p>
+              <p className="text-xs text-black/30 mb-6">Please check the console for details.</p>
               <button
                 onClick={handleRetry}
-                className="w-full py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80"
+                className="w-full py-3 bg-black text-white rounded-xl font-medium hover:bg-black/80 flex items-center justify-center gap-2"
               >
+                <RefreshCw className="w-5 h-5" />
                 Try Again
               </button>
             </div>
           )}
 
           {/* Inline error */}
-          {error && step !== 'error' && (
+          {error && !['error', 'success'].includes(step) && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}

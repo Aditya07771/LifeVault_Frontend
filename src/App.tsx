@@ -16,6 +16,8 @@ import Settings from "./pages/Settings";
 import Privacy from "./pages/Privacy";
 import Legacy from "./pages/Legacy";
 import NotFound from "./pages/NotFound";
+import SharedMemory from './pages/SharedMemory';
+
 
 const queryClient = new QueryClient();
 
@@ -68,6 +70,7 @@ const AppRoutes = () => {
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/privacy" element={<ProtectedRoute><Privacy /></ProtectedRoute>} />
       <Route path="/legacy" element={<ProtectedRoute><Legacy /></ProtectedRoute>} />
+      <Route path="/share/:shortCode" element={<SharedMemory />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

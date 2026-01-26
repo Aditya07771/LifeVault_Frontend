@@ -123,4 +123,40 @@ export const getInitials = (name?: string): string => {
   return name.substring(0, 2).toUpperCase();
 };
 
+// Share API
+export const shareAPI = {
+  // Create share link
+  create: (data: {
+    memoryId: string;
+    duration: string;
+    accessType?: 'view' | 'download';
+    maxViews?: number | null;
+    password?: string;
+  }) => api.post('/share', data),
+
+  // Get shared memory (public)
+  getShared: (shortCode: string, password?: string) => 
+    api.get(`/share/${shortCode}${password ? `?password=${encodeURIComponent(password)}` : ''}`),
+
+  // Verify share link (public)
+  verify: (shortCode: string) => api.get(`/share/${shortCode}/verify`),
+
+  // Get user's share links
+  getMyLinks: () => api.get('/share/user/my-links'),
+
+  // Get share links for a memory
+  getMemoryLinks: (memoryId: string) => api.get(`/share/memory/${memoryId}`),
+
+  // Revoke share link
+  revoke: (shortCode: string) => api.delete(`/share/${shortCode}`),
+
+  // Update share link
+  update: (shortCode: string, data: {
+    duration?: string;
+    maxViews?: number | null;
+    password?: string;
+    removePassword?: boolean;
+  }) => api.patch(`/share/${shortCode}`, data),
+};
+
 export default api;

@@ -18,7 +18,7 @@ import {
 
 const Settings: React.FC = () => {
   const { user, logout, updateUser } = useAuth();
-  const { isConnected, address, disconnect } = useWallet();
+  const { disconnect } = useWallet();
   const [copied, setCopied] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
 

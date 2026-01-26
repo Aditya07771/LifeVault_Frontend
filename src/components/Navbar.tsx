@@ -56,7 +56,7 @@ export function Navbar() {
 
           {/* Desktop CTAs */}
           <div className="hidden lg:flex items-center gap-4">
-            <button className="btn-outline-glow text-sm">
+            <button className="btn-outline-glow text-sm ">
               Connect Wallet
             </button>
             <a href="/login" className="nav-link">
