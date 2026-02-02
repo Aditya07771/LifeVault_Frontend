@@ -122,9 +122,12 @@ export function Navbar() {
                     <button className="btn-outline-glow w-full">
                       Connect Wallet
                     </button>
-                    <button className="btn-gradient w-full !py-3">
+                    <a href="/login" className="nav-link w-full text-center">
+                      <button className="btn-gradient w-full !py-3">
                       Sign Up
                     </button>
+                    </a>
+                    
                   </div>
                 </div>
               </div>

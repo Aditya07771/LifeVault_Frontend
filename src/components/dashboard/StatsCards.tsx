@@ -17,7 +17,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
     },
     {
       label: 'On Blockchain',
-      value: stats?.overview?.onChain || 0,
+      value: stats?.overview?.onChain || 5,
       icon: Layers,
       color: 'bg-green-500'
     },
@@ -53,4 +53,4 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
       ))}
     </div>
   );
-};
+};  

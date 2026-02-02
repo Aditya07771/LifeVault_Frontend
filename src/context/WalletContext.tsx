@@ -255,18 +255,27 @@ const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const response = await aptosSignMessage({
       message,
       nonce,
-      application: true,
-      chainId: true,
     });
 
-    console.log('📝 Sign response:', response);
+    console.log('📝 Raw sign response:', response);
 
-    const signature = toHexString(response.signature);
+    // Handle signature - it might be in different formats
+    let signature = '';
+    if (response.signature) {
+      signature = toHexString(response.signature);
+    } else if ((response as any).signedMessage) {
+      signature = toHexString((response as any).signedMessage);
+    }
+
+    // Ensure signature is in correct format (remove 0x if present for backend)
+    const cleanSignature = signature.startsWith('0x') ? signature.slice(2) : signature;
+
+    console.log('📝 Processed signature:', cleanSignature);
 
     return {
-      signature,
-      fullMessage: response.fullMessage,
-      nonce: response.nonce,
+      signature: cleanSignature,
+      fullMessage: response.fullMessage || message,
+      nonce: response.nonce || nonce,
       message: message,
     };
   }, [connected, aptosSignMessage]);
@@ -325,17 +334,25 @@ const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return { success: false, error: 'Failed to sign message' };
       }
 
+      // Clean up publicKey and signature - remove 0x prefix
+      const cleanPublicKey = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
+      const cleanSignature = signResult.signature.startsWith('0x') ? signResult.signature.slice(2) : signResult.signature;
+
       // Prepare request data
       const requestData = {
         address: address,
-        publicKey: publicKey,
-        signature: signResult.signature,
+        publicKey: cleanPublicKey,
+        signature: cleanSignature,
         message: signResult.message,
         fullMessage: signResult.fullMessage,
         nonce: signResult.nonce,
       };
 
-      console.log('Sending to backend:', requestData);
+      console.log('Sending to backend:', {
+        ...requestData,
+        signature: requestData.signature.substring(0, 20) + '...',
+        publicKey: requestData.publicKey.substring(0, 20) + '...'
+      });
 
       const response = await api.post('/auth/wallet', requestData);
 
@@ -374,10 +391,14 @@ const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const message = `Link this wallet to your LifeVault account.\n\nWallet: ${address}\nTimestamp: ${Date.now()}`;
       const signResult = await signMessage(message);
 
+      // Clean up publicKey and signature
+      const cleanPublicKey = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
+      const cleanSignature = signResult.signature.startsWith('0x') ? signResult.signature.slice(2) : signResult.signature;
+
       const requestData = {
         address: address,
-        publicKey: publicKey,
-        signature: signResult.signature,
+        publicKey: cleanPublicKey,
+        signature: cleanSignature,
         message: signResult.message,
         fullMessage: signResult.fullMessage,
         nonce: signResult.nonce,

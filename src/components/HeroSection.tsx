@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Play, Shield, Lock, Sparkles, Key } from "lucide-react";
 import { DotBackground } from "@/components/ui/grid-dot-background";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 // Rotating phrases for the hero
 const rotatingPhrases = [
@@ -262,7 +263,7 @@ export function HeroSection() {
                 whileTap={{ scale: 0.95 }}
                 className="h-12 px-8 rounded-full bg-black text-white text-sm font-medium hover:bg-neutral-800 transition-colors flex items-center gap-2 shadow-lg"
               >
-                Start Your Vault
+                <Link to="/register"> Start Your Vault </Link>
                 <motion.div
                   animate={{ x: [0, 4, 0] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
