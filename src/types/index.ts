@@ -4,6 +4,34 @@ export interface User {
   name?: string;
   aptosAddress?: string;
   aptosBalance?: number;
+  userType?: 'user' | 'creator' | 'brand' | 'government' | 'admin';
+  organizationInfo?: {
+    name?: string;
+    description?: string;
+    website?: string;
+    logo?: string;
+    isVerified?: boolean;
+    verifiedAt?: string;
+    category?: string;
+  };
+  level?: {
+    current?: number;
+    xp?: number;
+    xpToNextLevel?: number;
+  };
+  points?: {
+    current?: number;
+    lifetime?: number;
+  };
+  questStats?: {
+    totalCompleted?: number;
+    totalAttempted?: number;
+    totalPointsEarned?: number;
+    totalAptEarned?: number;
+    currentStreak?: number;
+    longestStreak?: number;
+    lastCompletedAt?: string;
+  };
   totalMemories: number;
   storageUsed: number;
   createdAt: string;
